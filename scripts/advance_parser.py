@@ -61,6 +61,10 @@ SCALAR_KEYS: frozenset[str] = frozenset({
     "allow_children",
     "depth",
     "content_priority",
+    "in_tree_of",
+    "pure_tooltip_entry",
+    "starting_technology_level",
+    "research_cost",
     "unlock_road_type",
     "unlock_employment_system",
     "unlock_unit",
@@ -81,6 +85,7 @@ SCALAR_KEYS: frozenset[str] = frozenset({
     "unlock_production_method",
     "unlock_diplomacy",
     "unlock_town_rights",
+    "unlock_chivalric_order",
 })
 
 BLOCK_KEYS: frozenset[str] = frozenset({
@@ -254,6 +259,13 @@ def _parse_fields(body: str) -> dict:
             stored = val if op == '=' else f"{op} {val}"
             _set(key, stored)
             i = m.end()
+            continue
+
+        # Bare identifier with no operator (e.g. inside unlock_diplomacy = { infiltrate_administration })
+        m = re.match(r'[A-Za-z_][A-Za-z0-9_]*', body[i:])
+        if m:
+            _set(m.group(0), m.group(0))
+            i += m.end()
             continue
 
         i += 1
@@ -573,7 +585,7 @@ def main():
     out_dir = Path("../in_game/common/advances")
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / "rl_advances.txt"
-    out_path.write_text("\n\n".join(sections), encoding='utf-8')
+    out_path.write_text("\n\n".join(sections), encoding='utf-8-sig')
     print(f"Output written to: {out_path}")
 
     # Random list output
@@ -592,7 +604,7 @@ def main():
     rl_dir = Path("../in_game/common/scripted_effects")
     rl_dir.mkdir(parents=True, exist_ok=True)
     rl_path = rl_dir / "rl_scripted_effects.txt"
-    rl_path.write_text(rl_output, encoding='utf-8')
+    rl_path.write_text(rl_output, encoding='utf-8-sig')
     print(f"Random list written to: {rl_path} ({len(rl_lines)} entries)")
 
     # Static modifiers output — one block per advance that had modifiers removed
@@ -612,7 +624,7 @@ def main():
     static_dir = Path("../main_menu/common/static_modifiers")
     static_dir.mkdir(parents=True, exist_ok=True)
     static_path = static_dir / "rl_modifiers.txt"
-    static_path.write_text("\n\n".join(static_sections), encoding='utf-8')
+    static_path.write_text("\n\n".join(static_sections), encoding='utf-8-sig')
     print(f"Static modifiers written to: {static_path} ({len(static_sections)} entries)")
 
     # Options output
@@ -648,7 +660,6 @@ def main():
             lines.append("\thidden_effect = {")
             lines.append(f"\t\tset_variable = flag_dummy_{name}")
             lines.append(f"\t\tresearch_advance = advance_type:dummy_{name}")
-            lines.append(f"\t\tchange_variable = {{ name = num_advances add = 1 }}")
             lines.append(f"\t\tset_variable = var_{name}")
             lines.append("\t}")
             lines.append("\tshow_as_tooltip = {")
@@ -687,7 +698,7 @@ def main():
     events_dir = Path("../in_game/events")
     events_dir.mkdir(parents=True, exist_ok=True)
     events_path = events_dir / "rl_events.txt"
-    events_path.write_text(events_output, encoding='utf-8')
+    events_path.write_text(events_output, encoding='utf-8-sig')
     print(f"Options written to: {events_path} ({len(option_sections)} entries)")
 
     # Localization output
@@ -714,22 +725,30 @@ def main():
         loc_name = loc.get(name, "")
         loc_lines.append(f' rl_events.1.{i}: "{loc_name}"')
 
-    # Tooltip loc keys — one per unlock key per advance
+    # Tooltip loc keys — one set per advance (using the first valid unlock label)
     for a in result.advances:
         name = a["_name"]
+        first_label = None
         for key in _UNLOCK_KEYS:
             if key not in a:
                 continue
-            value = a[key]
-            values = value if isinstance(value, list) else [value]
+            values = a[key] if isinstance(a[key], list) else [a[key]]
             for v in values:
-                if not isinstance(v, str):
-                    continue
-                label = _unlock_value_to_label(v)
-                tooltip_text = f"Unlocks {label}"
-                loc_lines.append(f' rl_tt_{name}: "{tooltip_text}"')
-                loc_lines.append(f' dummy_{name}: "{tooltip_text}"')
-                loc_lines.append(f' dummy_{name}_desc: "{tooltip_text}"')
+                if isinstance(v, str):
+                    first_label = _unlock_value_to_label(v)
+                    break
+                elif isinstance(v, dict) and v:
+                    # Block-syntax unlock e.g. unlock_diplomacy = { infiltrate_administration }
+                    first_label = _unlock_value_to_label(next(iter(v)))
+                    break
+            if first_label:
+                break
+        if not first_label:
+            continue
+        tooltip_text = f"Unlocks {first_label}"
+        loc_lines.append(f' rl_tt_{name}: "{tooltip_text}"')
+        loc_lines.append(f' dummy_{name}: "{tooltip_text}"')
+        loc_lines.append(f' dummy_{name}_desc: "{tooltip_text}"')
 
     loc_dir_out = Path("../main_menu/localization/english")
     loc_dir_out.mkdir(parents=True, exist_ok=True)

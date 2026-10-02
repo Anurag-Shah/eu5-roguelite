@@ -23,15 +23,11 @@ rl_monthly_action = {
             # If they do, we fire the event, then increment the variable
             if = {
                 limit = {
-                    num_of_advances_researched > var:num_advances
+                    modifier:rl_roll_mtd > var:num_advances
                 }
                 change_variable = {
                     name = num_advances
                     add = 1
-                }
-                set_variable = {
-                    name = rl_iterator
-                    value = 0
                 }
                 rl_rand_se = { v = 1 }
 
@@ -74,13 +70,13 @@ rl_monthly_action = {
             # If num_advances is unset, this country has not been initialized
             set_variable = {
                 name = num_advances
-                value = num_of_advances_researched
+                value = { add = modifier:rl_roll_mtd }
             }
             research_advance = advance_type:dummy_parent_advance        # Add the intitialization tech so the dummy advances work properly
-            change_variable = {
-                name = num_advances
-                add = 1
-            }
+            # change_variable = {
+            #     name = num_advances
+            #     add = 1
+            # }
         }
     }
 }
@@ -88,6 +84,8 @@ rl_monthly_action = {
 rl_startup_action = {
     trigger = {}
     effect = {
-        research_advance = advance_type:dummy_parent_advance
+        every_country = {
+            research_advance = advance_type:dummy_parent_advance
+        }
     }
 }

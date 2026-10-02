@@ -2,7 +2,7 @@
 	"name":	"Europa Survivors",
 	"id":	"",
 	"version":	"1.0",
-	"supported_game_version":	"1.2.*",
+	"supported_game_version":	"1.3.*",
 	"short_description":	"Desc",
 	"tags":	["Advancements", "Gameplay"],
 	"relationships":	[],
